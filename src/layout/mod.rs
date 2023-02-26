@@ -11,7 +11,8 @@ pub use composite::Multi;
 pub use composite::Slice;
 pub use composite::Struct;
 
-use std::alloc::LayoutError;
+pub use std::alloc::LayoutError;
+
 use std::convert::Infallible;
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;

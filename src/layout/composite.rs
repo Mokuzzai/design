@@ -61,8 +61,8 @@ unsafe impl TryToLayout for Multi {
 	fn try_to_layout(&self) -> Result<Layout, Self::Error> {
 		match *self {
 			Self::Layout(ref l) => Ok(l.to_layout()),
+			Self::Struct(ref l) => Ok(l.to_layout()),
 			Self::Slice(ref l) => (&**l).try_to_layout(),
-			Self::Struct(ref l) => l.try_to_layout(),
 		}
 	}
 }
@@ -99,11 +99,9 @@ pub struct Struct {
 	pub unpadded_layout: Layout,
 }
 
-unsafe impl TryToLayout for Struct {
-	type Error = LayoutError;
-
-	fn try_to_layout(&self) -> Result<Layout, Self::Error> {
-		Ok(self.unpadded_layout.pad_to_align())
+unsafe impl ToLayout for Struct {
+	fn to_layout(&self) -> Layout {
+		self.unpadded_layout.pad_to_align()
 	}
 }
 

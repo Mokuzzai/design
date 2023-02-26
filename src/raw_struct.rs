@@ -31,6 +31,12 @@ impl RawBoxedStruct {
 			std::alloc::dealloc(self.ptr.as_ptr(), layout)
 		}
 	}
+	pub fn as_ptr(&self) -> *const u8 {
+		self.ptr.as_ptr()
+	}
+	pub fn as_mut_ptr(&mut self) -> *mut u8 {
+		self.ptr.as_ptr()
+	}
 }
 
 pub struct BoxedStruct<L: TryToLayout> {
@@ -46,6 +52,15 @@ impl<L: TryToLayout> BoxedStruct<L> {
 			inner: RawBoxedStruct::alloc(l),
 			layout,
 		})
+	}
+	pub fn layout(&self) -> &L {
+		&self.layout
+	}
+	pub fn as_ptr(&self) -> *const u8 {
+		self.inner.as_ptr()
+	}
+	pub fn as_mut_ptr(&mut self) -> *mut u8 {
+		self.inner.as_mut_ptr()
 	}
 }
 
