@@ -70,3 +70,45 @@ unsafe impl<L> TryToLayout for L where L: ToLayout {
 		Ok(self.to_layout())
 	}
 }
+
+macro_rules! try_to_layout_for_tuple {
+	( $__:ident $( $_N:ident )* ) => {
+		unsafe impl<$__, $( $_N ),*> TryToLayout for ($__, $( $_N, )*)
+		where
+			$__: TryToLayout,
+			$__::Error: Into<LayoutError>,
+			$(
+				$_N: TryToLayout,
+				$_N::Error: Into<LayoutError>,
+			)*
+
+		{
+			type Error = LayoutError;
+
+			fn try_to_layout(&self) -> Result<Layout, Self::Error> {
+				#[allow(non_snake_case)]
+				let (ref $__, $( ref $_N ),* ) = *self;
+
+				let mut layout = Layout::new::<()>();
+
+				layout = layout.extend($__.try_to_layout().map_err(Into::into)?)?.0;
+				$(layout = layout.extend($_N.try_to_layout().map_err(Into::into)?)?.0;)*
+
+				Ok(layout.pad_to_align())
+			}
+		}
+
+		try_to_layout_for_tuple! { $( $_N )* }
+	};
+	() => {
+		unsafe impl TryToLayout for () {
+			type Error = Infallible;
+
+			fn try_to_layout(&self) -> Result<Layout, Self::Error> {
+				Ok(Layout::new::<()>())
+			}
+		}
+	}
+}
+
+try_to_layout_for_tuple! { L K J I H G F E D C B A }
