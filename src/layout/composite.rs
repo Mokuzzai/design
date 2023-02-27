@@ -52,7 +52,7 @@ unsafe impl<L: TryToLayout<Error = E>, E: Into<LayoutError>, const LENGTH: usize
 pub enum Multi {
 	Layout(Layout),
 	Slice(Box<Slice<Self>>),
-	Struct(Struct),
+	Struct(Struct<Self>),
 }
 
 unsafe impl TryToLayout for Multi {
@@ -79,58 +79,76 @@ impl<L: Into<Multi>> From<Slice<L>> for Multi {
 	}
 }
 
-impl From<Struct> for Multi {
-	fn from(l: Struct) -> Self {
+impl From<Struct<Self>> for Multi {
+	fn from(l: Struct<Self>) -> Self {
 		Self::Struct(l)
 	}
 }
 
 
 #[derive(Debug)]
-pub struct Field {
+pub struct Field<L> {
+	pub layout: L,
 	pub offset: usize,
-	pub layout: Multi,
 }
 
 
 #[derive(Debug)]
-pub struct Struct {
-	pub fields: Vec<Field>,
+pub struct Struct<L> {
+	pub fields: Vec<Field<L>>,
 	pub unpadded_layout: Layout,
 }
 
-unsafe impl ToLayout for Struct {
+unsafe impl<L> ToLayout for Struct<L> {
 	fn to_layout(&self) -> Layout {
 		self.unpadded_layout.pad_to_align()
 	}
 }
 
-impl Struct {
+impl<L> Struct<L> {
 	pub fn new() -> Self {
 		Self {
 			unpadded_layout: Layout::new::<()>(),
 			fields: Vec::new(),
 		}
 	}
-	pub fn push(&mut self, layout: impl Into<Multi>) -> Result<(), LayoutError> {
-		let field_layout_builder = layout.into();
-		let field_layout = field_layout_builder.try_to_layout()?;
+	pub fn len(&self) -> usize {
+		self.fields.len()
+	}
+	pub fn fields(&self) -> &[Field<L>] {
+		&self.fields
+	}
+}
+
+impl<L, E> Struct<L>
+where
+	L: TryToLayout<Error = E>,
+	E: Into<LayoutError>,
+{
+	pub fn push(&mut self, field_layout_builder: L) -> Result<usize, LayoutError> {
+		let index = self.len();
+
+		let field_layout = field_layout_builder.try_to_layout().map_err(Into::into)?;
 
 		let (new_struct_layout, offset) = self.unpadded_layout.extend(field_layout)?;
 
 		self.fields.push(Field { layout: field_layout_builder, offset });
 		self.unpadded_layout = new_struct_layout;
 
-		Ok(())
+		Ok(index)
+	}
+	pub fn with(mut self, field_layout_builder: L) -> Result<Self, LayoutError> {
+		self.push(field_layout_builder)?;
+		Ok(self)
 	}
 }
 
 #[test]
 fn slb() {
-	let mut slb = Struct::new();
+	let mut slb = Struct::<Multi>::new();
 
-	slb.push(Layout::new::<u32>()).unwrap();
-	slb.push(Slice::new(Layout::new::<u8>(), 3)).unwrap();
+	slb.push(Layout::new::<u32>().into()).unwrap();
+	slb.push(Slice::new(Layout::new::<u8>(), 3).into()).unwrap();
 
 	println!("{:?}", slb);
 	println!("{:?}", slb.try_to_layout());

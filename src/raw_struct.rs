@@ -69,3 +69,4 @@ impl<L: TryToLayout> Drop for BoxedStruct<L> {
 		unsafe { self.inner.dealloc(self.layout.try_to_layout().unwrap_unchecked()) }
 	}
 }
+

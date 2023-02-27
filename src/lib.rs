@@ -5,16 +5,12 @@
 pub mod layout;
 pub mod raw_struct;
 
-use layout::Layout;
-use layout::Result;
-use layout::ToLayout;
-
 use std::any::Any;
 use std::ptr::DynMetadata;
 use std::ptr::Pointee;
 use std::marker::Unsize;
 
-fn dyn_metadata<U, T: ?Sized + Any>() -> DynMetadata<T>
+pub fn dyn_metadata<U, T: ?Sized + Any>() -> DynMetadata<T>
 where
 	T: Pointee<Metadata = DynMetadata<T>>,
 	U: Unsize<T>,
@@ -22,63 +18,10 @@ where
 	std::ptr::metadata(0 as *const U as *const T)
 }
 
-struct Field<T: ?Sized + Any> {
-	metadata: DynMetadata<T>,
-	offset: usize,
-}
-
-unsafe impl<T: ?Sized + Any> ToLayout for Field<T> {
-	fn to_layout(&self) -> Layout {
-		self.metadata.layout()
-	}
-}
-
-pub struct HollowStruct<T: ?Sized + Any> {
-	unpadded_layout: Layout,
-	fields: Vec<Field<T>>,
-}
-
-impl<T: ?Sized + Any> HollowStruct<T> {
-	pub fn new() -> Self {
-		Self {
-			unpadded_layout: Layout::new::<()>(),
-			fields: Vec::new(),
-		}
-	}
-	pub fn push<U>(&mut self) -> Result<usize>
-	where
-		T: Pointee<Metadata = DynMetadata<T>>,
-		U: Unsize<T>,
-	{
-		let index = self.fields.len();
-
-		let (new_layout, offset) = self.unpadded_layout.extend(Layout::new::<U>())?;
-		let metadata = dyn_metadata::<U, T>();
-
-		self.fields.push(Field { metadata, offset });
-		self.unpadded_layout = new_layout;
-
-		Ok(index)
-	}
-	pub fn with<U>(mut self) -> Result<Self>
-	where
-		T: Pointee<Metadata = DynMetadata<T>>,
-		U: Unsize<T>,
-	{
-		self.push::<U>()?;
-
-		Ok(self)
-	}
-}
-
-unsafe impl<T: ?Sized + Any> ToLayout for HollowStruct<T> {
-	fn to_layout(&self) -> Layout {
-		self.unpadded_layout.pad_to_align()
-	}
-}
+pub type HollowStruct<T> = layout::composite::Struct<DynMetadata<T>>;
 
 #[test]
-fn test_hollow_struct() -> Result<()> {
+fn test_hollow_struct() -> layout::Result<()> {
 	use std::fmt::Debug;
 
 	#[repr(C)]
@@ -93,8 +36,8 @@ fn test_hollow_struct() -> Result<()> {
 	impl<T: Debug + Any> Object for T {}
 
 	let hs = HollowStruct::<dyn Object>::new()
-		.with::<u32>()?
-		.with::<[u8; 3]>()?
+		.with(dyn_metadata::<u32, _>())?
+		.with(dyn_metadata::<[u8; 3], _>())?
 	;
 
 	let a = Hs {
@@ -106,8 +49,8 @@ fn test_hollow_struct() -> Result<()> {
 
 	let hs = b.layout();
 
-	let _0 = hs.fields[0].offset;
-	let _1 = hs.fields[1].offset;
+	let _0 = hs.fields()[0].offset;
+	let _1 = hs.fields()[1].offset;
 
 	drop(hs);
 

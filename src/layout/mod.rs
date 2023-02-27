@@ -11,14 +11,22 @@ pub use composite::Multi;
 pub use composite::Slice;
 pub use composite::Struct;
 
-pub use std::alloc::LayoutError;
+#[derive(Debug)]
+#[derive(derive_more::From)]
+pub struct LayoutError(std::alloc::LayoutError);
+
+impl From<Infallible> for LayoutError {
+	// this function is never called, it exists solely to make rustc happy
+	fn from(_: Infallible) -> Self {
+		loop {}
+	}
+}
 
 use std::convert::Infallible;
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 
 pub type Result<T, E = LayoutError> = std::result::Result<T, E>;
-
 
 #[derive(Debug)]
 pub struct Alignment(NonZeroUsize); // NOTE: use `std::ptr::Alignment`?
@@ -53,6 +61,14 @@ pub unsafe trait ToLayout {
 unsafe impl ToLayout for Layout {
 	fn to_layout(&self) -> Layout {
 		*self
+	}
+}
+
+use std::ptr::DynMetadata;
+
+unsafe impl<T: ?Sized> ToLayout for DynMetadata<T> {
+	fn to_layout(&self) -> Layout {
+		self.layout()
 	}
 }
 

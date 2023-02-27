@@ -24,7 +24,7 @@ unsafe impl TryToLayout for NonZst {
 	type Error = LayoutError;
 
 	fn try_to_layout(&self) -> Result<Layout, Self::Error> {
-		Layout::from_size_align(self.size.get(), self.align.get())
+		Layout::from_size_align(self.size.get(), self.align.get()).map_err(Into::into)
 	}
 }
 
